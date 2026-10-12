@@ -1,0 +1,46 @@
+name: 辩驳既有命题
+description: 对某条已入库的核心命题提出反例或重构
+title: "[辩驳] "
+labels: ["refutation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 说明
+
+        最好的贡献不是附议，而是**证伪**。若你认为某条 `Pn` 站不住，或能给出更优的重构，请在此提交。
+
+        被证伪的命题编号**不回收**（保证历史引用有效），但会在 `PHILOSOPHY.md` 记录驳回理由。
+
+  - type: input
+    id: target
+    attributes:
+      label: 目标命题编号
+      description: 例如 P4
+      placeholder: "P4"
+    validations:
+      required: true
+
+  - type: textarea
+    id: counter
+    attributes:
+      label: 反例或张力
+      description: 具体说明该命题在哪里失效、或与哪条命题构成未调和的矛盾
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 支撑证据
+      description: 同样需要至少 2 个不同源，或给出一个明确的反例场景
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternative
+    attributes:
+      label: 建议重构（可选）
+      description: 若你能给出更优表述，请写出「重构而非删除」的替代版本
+    validations:
+      required: false

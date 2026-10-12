@@ -1,0 +1,56 @@
+name: 提出新命题
+description: 提交一条新的核心命题候选（须通过五重裁决）
+title: "[命题] "
+labels: ["proposition"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 提交前请自检
+
+        你的命题须**同时**满足五重裁决，任一条不满足将被驳回：
+
+        1. **边界安全** — 不触碰边界声明五条（不宣称神通 / 不创设教派 / 不涉政治定性）
+        2. **跨域性** — 至少引用 **2 个不同源**（三教 / 诸子 / 科学 / 现代思潮 / 科幻）
+        3. **新颖性** — 非既有 P0–Pn 的简单重述
+        4. **一致性** — 与既有命题无直接矛盾；若是重构须「重构而非删除」地调和
+        5. **可商榷性** — 以「可商榷」框架表述，不伪装为定论
+
+        **缺少「可证伪条件」的命题会被直接关闭。**
+
+  - type: textarea
+    id: statement
+    attributes:
+      label: 命题表述
+      description: 一句话说清命题，并以「（可商榷）」标注
+      placeholder: "Pn 自我是「叙事接口」（可商榷）：……"
+    validations:
+      required: true
+
+  - type: textarea
+    id: sources
+    attributes:
+      label: 多源证据
+      description: 至少 2 个不同源，涉科学/思潮/科幻者请给出处与年份
+      placeholder: |
+        ①科学：……
+        ②儒/道/佛/诸子：……
+        ③（可选）现代思潮 / 科幻：……
+    validations:
+      required: true
+
+  - type: textarea
+    id: inference
+    attributes:
+      label: 推演新知
+      description: 由此得出的、可检验的新命题或新隐喻
+    validations:
+      required: true
+
+  - type: textarea
+    id: falsifiable
+    attributes:
+      label: 可证伪条件
+      description: 什么情况下本命题失效？这是硬性要求。
+    validations:
+      required: true
