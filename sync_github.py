@@ -67,7 +67,7 @@ def api(method, path, data=None):
         req.add_header("Content-Type", "application/json")
         req.data = json.dumps(data).encode("utf-8")
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with urllib.request.urlopen(req, timeout=300) as r:
             return r.status, json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", "replace")
@@ -101,12 +101,10 @@ def put_file(path, raw_bytes, remote_sha, message):
     if remote_sha:
         data["sha"] = remote_sha
     status, resp = api("PUT", f"/repos/{REPO}/contents/{path}", data)
-    # 兜底：若 GET 误判为不存在而触发「sha wasn't supplied」，重新取 sha 后按更新重试
+    # 兜底：若 GET 误判为不存在而触发「sha wasn't supplied」，说明远端已有该文件；
+    # 此时不强行覆盖（避免丢失远端内容），按「保留远端、跳过」处理为良性结果。
     if status == 422 and remote_sha is None and "sha" in str(resp):
-        r2 = get_remote(path)
-        if r2:
-            data["sha"] = r2.get("sha")
-            status, resp = api("PUT", f"/repos/{REPO}/contents/{path}", data)
+        return True, "SKIP_EXISTING"
     if status in (200, 201):
         return True, None
     return False, f"HTTP {status}: {resp if isinstance(resp, str) else resp.get('message')}"
@@ -152,7 +150,10 @@ def main():
         if remote is None:
             ok, err = put_file(rel, local_bytes, None,
                                f"sync: 新增 {rel}")
-            if ok:
+            if ok and err == "SKIP_EXISTING":
+                log(f"SKIP_EXISTING {rel} (远端已存在，保留远端)")
+                skipped += 1
+            elif ok:
                 log(f"CREATE {rel}")
                 created += 1
             else:
