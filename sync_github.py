@@ -21,6 +21,7 @@
 import os
 import sys
 import json
+import time
 import base64
 import urllib.request
 import urllib.error
@@ -66,7 +67,7 @@ def api(method, path, data=None):
         req.add_header("Content-Type", "application/json")
         req.data = json.dumps(data).encode("utf-8")
     try:
-        with urllib.request.urlopen(req, timeout=90) as r:
+        with urllib.request.urlopen(req, timeout=120) as r:
             return r.status, json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", "replace")
@@ -75,9 +76,21 @@ def api(method, path, data=None):
         return -1, str(e)
 
 
+def api_retry(method, path, data=None, retries=3):
+    """网络抖动时重试；仅当确实拿到 HTTP 响应（非 -1/0）才返回。"""
+    last = None
+    for i in range(retries):
+        status, resp = api(method, path, data)
+        if status != -1 and status != 0:
+            return status, resp
+        last = resp
+        time.sleep(2 + i * 2)
+    return -1, last
+
+
 def get_remote(path):
-    status, data = api("GET", f"/repos/{REPO}/contents/{path}")
-    if status == 200:
+    status, data = api_retry("GET", f"/repos/{REPO}/contents/{path}")
+    if status == 200 and isinstance(data, dict):
         return data  # 含 'sha' 与 'content'(base64)
     return None
 
@@ -88,6 +101,12 @@ def put_file(path, raw_bytes, remote_sha, message):
     if remote_sha:
         data["sha"] = remote_sha
     status, resp = api("PUT", f"/repos/{REPO}/contents/{path}", data)
+    # 兜底：若 GET 误判为不存在而触发「sha wasn't supplied」，重新取 sha 后按更新重试
+    if status == 422 and remote_sha is None and "sha" in str(resp):
+        r2 = get_remote(path)
+        if r2:
+            data["sha"] = r2.get("sha")
+            status, resp = api("PUT", f"/repos/{REPO}/contents/{path}", data)
     if status in (200, 201):
         return True, None
     return False, f"HTTP {status}: {resp if isinstance(resp, str) else resp.get('message')}"
