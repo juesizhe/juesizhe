@@ -21,6 +21,29 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: domain
+    attributes:
+      label: 这一味属于哪个域
+      options:
+        - 三教（佛 / 道 / 儒）
+        - 诸子（墨 / 法 / 名 / 阴阳 / 兵 等）
+        - 现代科学
+        - 现代思潮
+        - 科幻 / 玄幻设定
+        - 其他
+    validations:
+      required: false
+
+  - type: input
+    id: handle
+    attributes:
+      label: 署名（用于证伪记名制）
+      description: 若你的反例成立，我们会把你的 ID 永久写在该命题的「已被…挑战」字段里，并显示在命题卡与证伪榜上。留空则记为 anon。
+      placeholder: "@your-id"
+    validations:
+      required: false
+
   - type: textarea
     id: counter
     attributes:
