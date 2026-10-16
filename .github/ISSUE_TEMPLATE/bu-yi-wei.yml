@@ -1,0 +1,67 @@
+name: 补一味
+description: 一句话补一条新来源（最轻量、30 秒可完成的贡献方式）
+title: "[补一味] "
+labels: ["source"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 说明
+
+        这是门槛最低的贡献方式：**一句话**，30 秒填完。
+
+        你只需要告诉我们——**某个传统 / 学科 / 作品是怎么看这件事的**。
+        不必写论文，不必论证，不必与既有命题调和。会通的工作由引擎来做。
+
+        填完后机器人会**立刻**自动判定（跨域性 / 是否笼统 / 是否已重复），并回帖告诉你结果。
+        被采纳的条目会进入语料库，下次推演中若被引用会自动 @ 你。
+
+  - type: input
+    id: topic
+    attributes:
+      label: 议题（一句话）
+      description: 例如「注意力与自我」「苦难与意义」；也可以指向某条 Pn
+      placeholder: "苦难与意义"
+    validations:
+      required: true
+
+  - type: textarea
+    id: line
+    attributes:
+      label: 你要补的那一味（一句话）
+      description: 某个传统 / 诸子 / 学科 / 科幻设定对这个议题的看法。越具体越好：给出篇名、学派、或作品名。
+      placeholder: "《列子·杨朱》把苦乐视作「顺逆之遇」，不问其有无意义。"
+    validations:
+      required: true
+
+  - type: input
+    id: source
+    attributes:
+      label: 出处（可选，越具体越好）
+      description: 篇名 / 作者 / 期刊 / 年份 / doi，任一即可
+      placeholder: "《列子·杨朱》"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: 这一味属于哪个域
+      options:
+        - 三教（佛 / 道 / 儒）
+        - 诸子（墨 / 法 / 名 / 阴阳 / 兵 等）
+        - 现代科学
+        - 现代思潮
+        - 科幻 / 玄幻设定
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: handle
+    attributes:
+      label: 署名（可选）
+      description: 希望在采用出处里如何称呼你，例如 GitHub ID。留空则记为 anon。
+      placeholder: "@your-id"
+    validations:
+      required: false
