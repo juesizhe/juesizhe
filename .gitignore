@@ -1,6 +1,9 @@
 # 本地技能记忆（每技能私有，非技能本体，禁止上传）
 .workbuddy/
 
+# GitHub Pages 本地构建产物（由 Actions 在云端生成）
+_site/
+
 # 操作系统/编辑器噪声
 .DS_Store
 Thumbs.db
