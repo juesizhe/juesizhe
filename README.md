@@ -4,6 +4,10 @@
 
 **Juesizhe** is an open, self-evolving philosophical synthesis engine for AI agents. It does not answer from a single tradition. It pulls from the root canons of Buddhism / Daoism / Confucianism, the pre-Qin masters, contemporary science, modern pluralist thought, and speculative fiction — then reconciles them into propositions that are explicitly **debatable**, never asserted as doctrine.
 
+> ### 本周最可能被推翻的命题 —— 来推翻它。
+> 命题卡在 [`cards/latest.md`](cards/latest.md) · 全部卡片 [`cards/index.html`](cards/index.html)
+> 提出有效反例的人会**永久记名**在该命题上（见下方「证伪榜」）。一个人会通的边界太小，所以这台引擎从第一天起就是开放的。
+
 ---
 
 ## 它是什么 / What it is
@@ -22,38 +26,79 @@
    ① 边界安全 ② 跨域性(≥2源) ③ 新颖性 ④ 一致性 ⑤ 可商榷性
 ```
 
-两条定时管线，各司其职：
+三条管线（2026-10-17 起改为**批处理**，固定上下文一天只付两次）：
 
-| 管线 | 职责 |
-|------|------|
-| **夜间推演**（0/2/4/6 点） | 扩大思维领域 —— 每轮产出 1 条候选命题，过五重裁决后入库 |
-| **黎明蒸馏**（7 点） | 去重、合并、精炼 —— 重写 `CORE.md`，记蒸馏日志 |
+| 管线 | 职责 | 每场议题数 |
+|------|------|---:|
+| **夜间批处理**（00:00 · 云端） | 扩大思维领域 —— 一场连推 3–4 题，每题各过一次五重裁决 | 3–4 |
+| **白天批处理**（10:00 · 本机 qwen3:14b） | 同上，核心哲思推理由本地模型承担（电费替代 token） | 3 |
+| **汇总精炼**（周度 · 云端） | 去重、合并、精炼 —— 重写 `CORE.md`，记蒸馏日志 | — |
+
+> 旧版为「夜间 4 场 + 白天 4 场」共 8 个独立会话；改批处理是因为每场都要重付一次固定上下文开销。
 
 **铁律**：自动流程**只能**在 `SKILL.md` 的 `AUTO_EVOLVE` 标记内**追加**条目，绝不改写边界声明、工作流等其他章节。编号一经使用**不回收**，保证历史引用永久有效。
+
+### 历史推演防膨胀 / Anti-bloat
+
+推演历史只增不减，全量加载必然撑爆上下文。因此：
+
+- `PHILOSOPHY.md` = **原始档案**，只追加、永不删，不进 prompt。
+- `PHILOSOPHY_SUMMARY.md` = **浓缩摘要**（≤4000 token），是下一轮推演的唯一上下文来源。
+- 每 **5 轮**完整推演触发一次压缩；计数持久化在 `run_counter.md`，重启不清零。
+- 需要原始细节时只准取局部片段：`python scripts/deduction_memory.py fragment --pattern "关键词"`。
 
 ## 仓库结构 / Structure
 
 ```
 juesizhe/
+├── prompts/
+│   ├── deduce.md                  # 推演专用精简载荷（规则全量 + 命题只留索引，约 12KB）
+│   └── core_index.md              # 纲要索引（约 2KB）
+├── cards/                         # 命题卡（由 scripts/make_card.py 自动生成）
+│   ├── index.html                 # 全部卡片索引
+│   ├── latest.md                  # 本周命题卡（README 顶部引用）
+│   └── Pn.html / Pn.md
+├── scripts/
+│   ├── deduction_memory.py        # 防膨胀工具：计数 / token 估算 / 压缩 / 局部检索
+│   ├── build_deduce.py            # 生成推演精简载荷 + 纲要索引
+│   ├── contrib_check.py           # 机判定前置校验器（确定性，零 LLM）
+│   └── make_card.py               # 命题卡生成器（模板拼串，零 LLM）
 ├── SKILL.md                       # 主规范：边界声明、多源基底、工作流、核心命题库 P0–Pn
-├── CORE.md                        # 精炼纲要（思想锚点，由黎明蒸馏整份重写）
-├── PHILOSOPHY.md                  # 推演日志 / 自我改进日志（采纳·驳回·待裁定）/ 蒸馏日志
+├── CORE.md                        # 精炼纲要（思想锚点，由汇总精炼整份重写）
+├── PHILOSOPHY.md                  # 原始推演档案：推演日志 / 自我改进日志 / 蒸馏日志（只追加，永不删）
+├── PHILOSOPHY_SUMMARY.md          # 浓缩摘要（≤4000 token），下一轮推演的唯一上下文来源
+├── run_counter.md                 # 轮次计数 + 压缩水位线（持久化，重启不清零）
 ├── references/
 │   ├── canon.md                   # 经典根脉速查（三教 + 诸子）
 │   ├── tuiyan_corpus.md           # 推演语料库（657K，含历次多源素材）
-│   └── tuiyan_pool_state.md       # 议题池状态机
+│   ├── tuiyan_pool_state.md       # 议题池状态机
+│   ├── evidence_ledger.md         # 已验证证据表 + 伪证黑名单（避免重复检索）
+│   ├── challenges.json            # 证伪记名：谁挑战了哪条命题
+│   └── budget.md                  # token 预算与降级策略
 └── LICENSE                        # MIT
 ```
 
 ## 安装使用 / Install
 
-作为一个 Agent Skill 使用，把本仓库放到你的 skills 目录即可：
+作为一个 Agent Skill 使用，把本仓库放到你的 skills 目录即可 —— 一行搞定：
 
 ```bash
+# mac / Linux / WSL
 git clone https://github.com/juesizhe/juesizhe.git ~/.workbuddy/skills/philosopher-sage
+
+# Windows（PowerShell）
+git clone https://github.com/juesizhe/juesizhe.git "$env:USERPROFILE\.workbuddy\skills\philosopher-sage"
 ```
 
-触发场景：当你希望以多源会通的方式探讨存在、心性、伦理、未来，或需要一位持续学习、推陈出新的哲学思考伙伴时。
+**装好即用，不必配置。** 装了之后，你在自己的 Agent 里问下面这类问题，就会自动唤起见思者：
+
+| 新手三问（照抄即可） | 它会做什么 |
+|---|---|
+| 「讲讲苦难有没有意义，用佛道儒和科学一起看。」 | 多源会通，给一句点化 + 一条可商榷的判准 |
+| 「我最近总觉得注意力被抢走，这在哲学上怎么理解？」 | 把个人处境接进化过的命题骨架，不一味给鸡汤 |
+| 「如果记忆能被上传到云端，'我'还在吗？」 | 用科幻设定作思想实验，同时给出可证伪条件 |
+
+> **每一个装了它的人，对话里都会出现它。** 这就是本项目全部的推广方式——产品本身就是渠道。
 
 ## 参与共建 / Contributing
 
@@ -61,10 +106,27 @@ git clone https://github.com/juesizhe/juesizhe.git ~/.workbuddy/skills/philosoph
 
 欢迎这些贡献：
 
+0. **补一味（30 秒）** —— 最低门槛：一句话告诉我们「某个传统 / 学科 / 作品怎么看这件事」。
+   用 [`补一味` Issue 模板](.github/ISSUE_TEMPLATE/bu-yi-wei.yml)，不必论证，不必与既有命题调和。
+   **提交后机器人立刻机判回帖**（跨域 / 是否笼统 / 是否已重复），马上就知道能不能用。
 1. **补源** —— 你熟悉的经典、学派、前沿论文、科幻设定，补进 `references/canon.md` 或语料库。
 2. **辩驳** —— 对某条 `Pn` 命题提出反例。最好的贡献是**证伪它**，或给出更优的重构。
 3. **提新命题** —— 直接开 PR 追加 `- Pn`，务必满足五重裁决，尤其要写清**可证伪条件**。
 4. **修机制** —— 自迭代规则、蒸馏策略、边界声明的措辞改进（结构性改动需 maintainer 评审）。
+
+### 证伪榜（记名）
+
+第一个给出有效反例的人，其 ID 会**永久写在该命题的「已被…挑战」字段**里（编号不回收，但你的名字跟着它走），
+显示在命题卡 `cards/Pn.html` 与 `references/challenges.json` 里，汇集于本节。
+
+> 把它当成「一起来推翻它」的机会，而不是挑错。**被推翻的那一条不会被删掉**——它会被记为「在何处失效」。
+
+### 不必写长文（30 秒也能贡献）
+
+所有外部贡献在进模型前都会先过一遍确定性机检（`scripts/contrib_check.py`，不调用任何大模型）：
+字段完整性 / 跨域 ≥2 源 / 禁用笼统来源词 / 是否复述既有命题 / 伪证黑名单。
+**机检不通过**会给明确理由，**机检通过**才由 maintainer 做最终的五重裁决。
+这既省了 token，也让你的意见不被静默吞掉——每一条都有回帖。
 
 ### 提交命题的格式要求
 
