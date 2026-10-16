@@ -6,7 +6,7 @@ name: 发布命题卡到 GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ["cards/**", ".github/workflows/pages.yml"]
+    paths: ["cards/**", ".github/workflows/pages.yml", ".github/scripts/build_pages_site.py"]
   workflow_dispatch:
 
 permissions:
@@ -27,50 +27,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 准备站点（cards/ + 简易首页）
-        run: |
-          mkdir -p _site
-          cp -r cards/* _site/ 2>/dev/null || true
-          python - <<'PY'
-          import os, re, html
-          site = "_site"
-          files = sorted((f for f in os.listdir(site) if re.match(r"^P\d+\.html$", f)),
-                         key=lambda s: int(s[1:-5]))
-          rows = "\n".join(
-              f'<li><a href="{f}">{f[:-5]}</a></li>' for f in files
-          )
-          latest = files[-1][:-5] if files else ""
-          page = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>觉思者 · 可被推翻的命题</title>
-<style>
-body{font-family:"Songti SC","Noto Serif SC",Georgia,serif;background:#fbf8f3;color:#24201c;
-     max-width:760px;margin:0 auto;padding:48px 24px;line-height:1.8}
-h1{font-size:28px;margin:0 0 4px}
-.eyebrow{font-size:12px;letter-spacing:.24em;color:#8a5a2b;text-transform:uppercase}
-.card{border:1px solid #e6ded2;background:#fff;border-radius:12px;padding:22px 24px;margin-top:20px}
-a{color:#8a5a2b}
-.foot{margin-top:30px;font-size:12.5px;color:#8a8078}
-</style></head><body>
-<div class="eyebrow">Juesizhe · Propositions that invite refutation</div>
-<h1>觉思者 · 可被推翻的命题</h1>
-<p>这里每一条都写明了自己的失效条件。最好的参与方式不是同意，而是<strong>推翻它</strong>——
-第一个给出有效反例的人会永久留名在该命题上。</p>
-<div class="card"><ul>"""+rows+"""</ul></div>
-<div class="card">
-<p><strong>最新一条：<a href=\""""+latest+""".html\">"""+latest+"""</a></strong></p>
-<p>推翻入口：<code>github.com/juesizhe/juesizhe/issues/new?template=refutation.yml</code><br>
-只补一个源也可以（30 秒）：<code>.../issues/new?template=bu-yi-wei.yml</code></p>
-</div>
-<div class="foot">本站点由纯脚本生成，推送即更新，不调用任何生成式模型。<br>
-觉思者 Juesizhe · MIT License</div>
-</body></html>"""
-          open(os.path.join(site, "index.html"), "w", encoding="utf-8").write(page)
-          PY
+      - name: 构建站点
+        run: python .github/scripts/build_pages_site.py
 
       - uses: actions/configure-pages@v5
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+
       - id: deployment
         uses: actions/deploy-pages@v4
