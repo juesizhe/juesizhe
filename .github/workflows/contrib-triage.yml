@@ -19,61 +19,57 @@ jobs:
       - name: 检出仓库
         uses: actions/checkout@v4
 
-      - name: 组装待检文本
-        id: build
-        run: |
-          python - <<'PY' > checked.md
-          import json, os
-          issue = json.loads(os.environ['ISSUE'])
-          print(issue['title'])
-          print()
-          print(issue['body'] or '')
-          print()
-          print('labels:' + ','.join(l['name'] for l in issue.get('labels', [])))
-          PY
-        env:
-          ISSUE: ${{ toJson(github.event.issue) }}
-
-      - name: 机判（允许失败以便输出结论）
-        id: check
-        continue-on-error: true
-        run: |
-          set +e
-          python scripts/contrib_check.py checked.md --json > result.json
-          echo "exit=$?" >> $GITHUB_OUTPUT
-          cat result.json
-
-      - name: 回帖结论
+      # 单一 Node 步骤完成「组装文本 → 机判 → 回帖」：
+      # 避免 shell 插值导致的脚本注入，也避免多行环境变量的兼容问题。
+      - name: 机判并回帖
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
+            const cp = require('child_process');
+            const issue = context.payload.issue;
+
+            const labels = (issue.labels || []).map(l => l.name).join(',');
+            const text = [issue.title, '', issue.body || '', '', 'labels:' + labels].join('\n');
+            fs.writeFileSync('checked.md', text, 'utf8');
+
             let res;
-            try { res = JSON.parse(fs.readFileSync('result.json','utf8')); }
-            catch (e) { res = { passed: false, domains: [], issues: [{level:'驳回', msg:'机判执行失败'}] }; }
-            const passed = res.passed;
+            try {
+              const out = cp.execFileSync(
+                'python3', ['scripts/contrib_check.py', 'checked.md', '--json'],
+                { encoding: 'utf8' }
+              );
+              res = JSON.parse(out);
+            } catch (e) {
+              // 退出码 1 = 机检未通过；其他异常按失败处理，输出里也尝试取结论
+              const stdout = (e.stdout || '').toString();
+              try { res = JSON.parse(stdout); }
+              catch (e2) { res = { passed: false, domains: [], issues: [{ level: '驳回', msg: '机判脚本异常' }] }; }
+            }
+
             const lines = [];
-            lines.push(passed ? '### ✔ 已通过初检' : '### ✘ 暂未通过初检');
+            lines.push(res.passed ? '### ✔ 已通过初检' : '### ✘ 暂未通过初检');
             lines.push('');
-            lines.push('**命中源域**：' + (res.domains.length ? res.domains.join('、') : '无'));
+            lines.push('**命中源域**：' + ((res.domains || []).length ? res.domains.join('、') : '无'));
             lines.push('');
-            if (res.issues.length) {
+            if (res.issues && res.issues.length) {
               lines.push('**机判结果**');
               for (const i of res.issues) lines.push(`- [${i.level}] ${i.msg}`);
             } else {
               lines.push('**机判结果**：无问题项。');
             }
             lines.push('');
-            if (passed) {
+            if (res.passed) {
               lines.push('这条已可用，等待 maintainer 并入语料库 / 进入下一轮推演。');
-              lines.push('被引用时会在采用出处里 @ 你 —— 你的这一味会真的改变下一次输出。');
+              lines.push('被引用时会在采用出处里署名你 —— 你的这一味会真的改变下一次输出。');
             } else {
-              lines.push('修正上面标「驳回」的项后编辑本 Issue，会自动重新判定。绝大多数不通过只需两处改动：**补具体出处** + **再换一个不同源**。');
+              lines.push('绝大多数不通过只需两处改动：**补具体出处** + **再换一个不同源**。修改后直接编辑本 Issue，会自动重新判定。');
             }
             lines.push('');
             lines.push('<sub>本裁决由 `scripts/contrib_check.py` 确定性执行，未调用任何生成式模型。</sub>');
+
             await github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: lines.join('\n')
