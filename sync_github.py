@@ -17,6 +17,14 @@
 用法：
   GITHUB_TOKEN=xxx python sync_github.py
   python sync_github.py        # 自动从 ~/.workbuddy/github_token.txt 读取
+  python sync_github.py --force        # 冲突时一律以本地为准（见下方说明）
+  python sync_github.py --force-file a.md --force-file b.py  # 只对指定文件强制以本地为准
+
+关于「保留更完整一方」的默认规则：
+  冲突时默认保留字节更长的一方，以防覆盖远端他人的改动。
+  但该规则会挡住一类正常变更——由脚本重新生成且内容被有意缩短的文件
+  （例：prompts/deduce.md 刷新时间戳后重排、cards/Pn.md 标题截断、重构后变短的 workflow）。
+  遇到这类情况用 --force / --force-file 显式以本地为准。
 """
 import os
 import sys
@@ -123,8 +131,26 @@ def walk_local():
     return sorted(files)
 
 
+def parse_args(argv):
+    """返回 (force_all: bool, force_files: set[str])。"""
+    force_files = set()
+    for i, a in enumerate(argv):
+        if a == "--force-file" and i + 1 < len(argv):
+            force_files.add(argv[i + 1].replace("\\", "/").lstrip("./"))
+    return ("--force" in argv), force_files
+
+
+def resolve_conflict(rel, local_bytes, remote_bytes, remote, force_all, force_files):
+    """
+    冲突处置。默认「保留字节更长、更完整的一方」；命中 force 则以本地为准。
+    返回 "local" / "remote"，不上传其行为由调用方处理。
+    """
+    return "local" if (force_all or rel in force_files or len(local_bytes) >= len(remote_bytes)) else "remote"
+
+
 def main():
     global TOKEN
+    FORCE_ALL, FORCE_FILES = parse_args(sys.argv[1:])
     TOKEN = get_token()
     if not TOKEN:
         log("ERROR: 未找到 GitHub Token")
@@ -170,13 +196,9 @@ def main():
         conflicts += 1
         remote_len = len(remote_bytes)
         local_len = len(local_bytes)
-        if local_len >= remote_len:
-            chosen = "local"
-            chosen_bytes = local_bytes
-        else:
-            chosen = "remote"
-            chosen_bytes = remote_bytes
-        log(f"CONFLICT {rel}: 本地 {local_len}B / 远端 {remote_len}B → 保留【{chosen}】(更完整)")
+        why = "强制(--force)" if (FORCE_ALL or rel in FORCE_FILES) else f"本地 {local_len}B / 远端 {remote_len}B"
+        chosen = resolve_conflict(rel, local_bytes, remote_bytes, remote, FORCE_ALL, FORCE_FILES)
+        log(f"CONFLICT {rel}: {why} → 保留【{chosen}】")
         if chosen == "local":
             ok, err = put_file(rel, local_bytes, remote.get("sha"),
                                f"sync: 以本地为准更新 {rel}")
