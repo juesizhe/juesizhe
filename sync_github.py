@@ -136,7 +136,10 @@ def parse_args(argv):
     force_files = set()
     for i, a in enumerate(argv):
         if a == "--force-file" and i + 1 < len(argv):
-            force_files.add(argv[i + 1].replace("\\", "/").lstrip("./"))
+            p = argv[i + 1].replace("\\", "/")
+            if p.startswith("./"):
+                p = p[2:]
+            force_files.add(p)
     return ("--force" in argv), force_files
 
 
