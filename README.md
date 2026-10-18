@@ -1,6 +1,6 @@
 # 觉思者 · Juesizhe
 
-> 跨域哲学综合专家 —— 佛道儒 × 诸子百家 × 现代科学 × 现代多元思潮 × 科幻玄幻，多源会通，推陈出新。
+> 跨域哲学综合专家 —— 佛道儒 × 诸子百家 × **世界宗教哲学（基督教 / 伊斯兰教 / 犹太教 / 印度系 / 耆那教等）** × **古希腊罗马理性** × **文明地方智慧** × 现代科学 × 现代多元思潮 × 科幻玄幻，多源会通，推陈出新。
 
 **Juesizhe** is an open, self-evolving philosophical synthesis engine for AI agents. It does not answer from a single tradition. It pulls from the root canons of Buddhism / Daoism / Confucianism, the pre-Qin masters, contemporary science, modern pluralist thought, and speculative fiction — then reconciles them into propositions that are explicitly **debatable**, never asserted as doctrine.
 
@@ -14,7 +14,8 @@
 
 一套可运行的 **AI 专家人格规范（Agent Skill）**，不是一个聊天机器人，也不是一套教义。
 
-- **不是** 宗教工具 —— 不宣称神通、不创设教派、不输出祷告仪轨（见 `SKILL.md` 边界声明）。
+- **不是** 宗教工具 —— 不宣称神通、不创设教派、不输出祷告仪轨、不传教（见 `SKILL.md` 边界声明）。
+  但它**会**把各宗教传统的**哲学论证与伦理洞见**当作思辨来源之一——只取可论证的命题，去仪轨化，不宣称任何传统为真或更优。
 - **不是** 定论机器 —— 每条核心命题都标注"可商榷"，并附**可证伪条件**。
 - **是** 一台会自己长大的思辨引擎 —— 内置自迭代机制，能按规则自主产出、裁决、蒸馏新命题。
 
@@ -95,6 +96,8 @@ git clone https://github.com/juesizhe/juesizhe.git "$env:USERPROFILE\.workbuddy\
 | 新手三问（照抄即可） | 它会做什么 |
 |---|---|
 | 「讲讲苦难有没有意义，用佛道儒和科学一起看。」 | 多源会通，给一句点化 + 一条可商榷的判准 |
+| 「爱一个人该不该图回报？用儒家、基督教圣爱和斯多亚一起看。」 | 跨文明对举，给判准与可证伪条件 |
+| 「不同宗教都说要爱人，它们的理由一样吗？」 | 同源异路的并置与张力分析（不判优劣） |
 | 「我最近总觉得注意力被抢走，这在哲学上怎么理解？」 | 把个人处境接进化过的命题骨架，不一味给鸡汤 |
 | 「如果记忆能被上传到云端，'我'还在吗？」 | 用科幻设定作思想实验，同时给出可证伪条件 |
 
@@ -140,6 +143,10 @@ git clone https://github.com/juesizhe/juesizhe.git "$env:USERPROFILE\.workbuddy\
 ```
 
 **不满足"至少两个不同源"或"未标可商榷"的命题会被自动驳回。**
+
+源域已扩至 11 类：三教 / 诸子 / **基督 / 伊斯兰 / 犹太 / 印度系 / 希腊 / 地方智慧** / 科学 / 思潮 / 科幻。
+引用宗教哲学须带**人物 + 篇名**（如「阿奎那《神学大全》」），禁「圣经说 / 宗教认为」式笼统词；
+凡出现宣教、崇拜、仪轨语气（如「应当信」「这是上帝的旨意」）将被机检直接驳回。
 
 ## 边界 / Boundaries
 
