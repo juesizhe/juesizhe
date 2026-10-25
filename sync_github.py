@@ -39,7 +39,7 @@ REPO = "juesizhe/juesizhe"
 API = "https://api.github.com"
 ROOT = os.path.dirname(os.path.abspath(__file__))          # 技能根目录
 BRANCH = "main"
-EXCLUDE_DIRS = {".git", ".workbuddy", "_site"}
+EXCLUDE_DIRS = {".git", ".workbuddy", "_site", "skills"}  # skills/ = 本地整合的配套技能副本，不推送到公开哲学站点仓库
 EXCLUDE_FILES = set()                                      # 可在需要时追加
 TOKEN_FILE = os.path.join(os.path.expanduser("~"), ".workbuddy", "github_token.txt")
 LARGE_FILE_GUARD = 950 * 1024                              # >950KB 走警告跳过（极少触发）
