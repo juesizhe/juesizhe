@@ -6,7 +6,7 @@
 目的
 ====
 推演任务真正消耗的 token，绝大部分花在「每场重新加载全套档案」上：
-SKILL.md(295KB) + CORE.md(94KB) + PHILOSOPHY.md(346KB) ≈ 735KB。
+SKILL.md + CORE.md + PHILOSOPHY.md + 素材池合计约 1.7MB（≈110 万 token，以 --check 实测为准）。
 本脚本从 SKILL.md / CORE.md 中**派生**两份精简载荷：
 
   prompts/deduce.md     推演专用载荷（约 10KB）：规则全量、命题只留索引行
@@ -26,6 +26,8 @@ SKILL.md(295KB) + CORE.md(94KB) + PHILOSOPHY.md(346KB) ≈ 735KB。
 - 只读不写源文件：绝不修改 SKILL.md / CORE.md。
 - 派生文件可被随时重新生成，不是权威源；权威永远是 SKILL.md 与 CORE.md。
 - 每次采纳新命题后应重跑本脚本，使索引保持最新。
+- **体量数字（{skill_kb} 等）在构建时实测回填**，不手写——手写数字必然漂移
+  （2026-10-21 修复：模板里 295KB / 346KB / 94KB 均为过期值，实际已 423KB / 473KB / 216KB）。
 """
 import os
 import re
@@ -50,6 +52,11 @@ def read(path):
 def truncate(s, n):
     s = s.strip()
     return s if len(s) <= n else s[:n] + "…"
+
+
+def kb(path):
+    """实测文件体量（KB），用于载荷里的「禁止整本读」提示——杜绝手写数字漂移。"""
+    return f"{os.path.getsize(path) / 1024:.0f}KB" if os.path.exists(path) else "缺失"
 
 
 def parse_propositions(text):
@@ -112,15 +119,20 @@ TEMPLATE = """# 觉思者 · 推演专用精简载荷（prompts/deduce.md）
 
 ---
 
-## 0 · 加载纪律（省 token 的根本）
+## 0 · 加载纪律与写盘门禁（省 token 的根本）
 
 **开场只读四件**：本文件 + `prompts/core_index.md` + `PHILOSOPHY_SUMMARY.md`(≤4000 token) + `references/tuiyan_pool_state.md`（台账）。
 
+**写盘前必过门禁（2026-10-21 起强制）**：任何写盘动作之前先跑
+`python scripts/preflight.py`——它机检行尾完整性（裸 CR）/ AUTO_EVOLVE 标记 / 编号连续性 /
+命题↔纲要计数 / 派生索引新鲜度 / 摘要体量；**不过则不许写盘**。
+发现裸 CR 用 `python scripts/preflight.py --repair-eol`（自动备份到 `.workbuddy/bak/` 后只修 CR、不碰其他字节）。
+
 **禁止**：
-- ❌ 推理前整本读 `SKILL.md`（295KB）——只看 overwrite 「核心命题库」区，且优先看本文件索引。
-- ❌ 推理前整本读 `PHILOSOPHY.md`（346KB）——它只追加不删，全量加载必然撑爆上下文。
-- ❌ 推理前整本读 `references/tuiyan_corpus.md`（657KB）——草稿素材池，只取索引与命中片段。
-- ❌ 推理前整本读 `CORE.md`（94KB）——默认读 `prompts/core_index.md`，只有需要完整论证链时才回查正文。
+- ❌ 推理前整本读 `SKILL.md`（{skill_kb}）——只看 overwrite「核心命题库」区，且优先看本文件索引。
+- ❌ 推理前整本读 `PHILOSOPHY.md`（{phil_kb}）——它只追加不删，全量加载必然撑爆上下文。
+- ❌ 推理前整本读 `references/tuiyan_corpus.md`（{corpus_kb}）——草稿素材池，只取索引与命中片段。
+- ❌ 推理前整本读 `CORE.md`（{core_kb}）——默认读 `prompts/core_index.md`，只有需要完整论证链时才回查正文。
 
 **唯一合法的档案局部调阅通道**（单次 ≤8000 字符）：
 ```bash
@@ -182,6 +194,7 @@ python scripts/deduction_memory.py fragment --pattern "关键词" --context 1 --
 ```
 
 同步动作：
+0. **写盘前门禁**：`python scripts/preflight.py` 必须通过（见第 0 节）——先过门禁，再动 SKILL.md / CORE.md / 台账；修裸 CR 用 `--repair-eol`。
 1. `references/tuiyan_pool_state.md` 消费台账追加一行（日期 / 议题 / 判定）。
 2. `PHILOSOPHY.md` 推演日志 + 自我改进日志追加（只追加，永不删改）。
 3. `python scripts/deduction_memory.py incr --note "T0xx 议题名"`（+1 立即回写）。
@@ -193,6 +206,8 @@ python scripts/deduction_memory.py fragment --pattern "关键词" --context 1 --
 - **轮次**：开场 `status` + `summary-check`；收尾 `incr`。轮次 ≥5 → 执行压缩 → `mark-compressed --lines <行数>`；失败走 `compress-fail`（轮次**不归零**）。
 - **无产出不计数**：调用失败 / 服务不可用 → 追加一行跳过记录，**计 0 轮**，**绝不伪造命题**。
 - **本地模型不可用**（白天场）：在 PHILOSOPHY.md 追加「跳过」后结束，不编造。
+- **单场单题（2026-10-21 起强制）**：一场推演只消费**一个** T 议题、只落**一条**命题、写盘前只跑**一次** preflight。
+  批量选题必须拆成多场逐场落库——2026-10-20 夜间「一场四题合并消费 + CORE 七区整份重写」把四场风险叠成一次高风险写盘，是本轮复盘中回滚隐患的最大单项。
 
 ## 6 · 本机 qwen3:14b 调用规范（白天场）
 
@@ -208,6 +223,15 @@ python scripts/deduction_memory.py fragment --pattern "关键词" --context 1 --
   - E 须写明可证伪条件。
   - 输出 JSON：`{{"议题":"","多源要点":[],"候选命题":"","引用来源":[],"可证伪条件":"","与既有命题的关系":""}}`，不要 markdown 代码块标记。
 - 已知缺陷（不要指望自愈）：本地模型**常缺儒 / 佛条目**，回喂一次也不一定补上 → **由编排者落库前补齐**。
+- **首轮自检七项（2026-10-21 起 · 输出前逐项核对，缺一即回炉重跑，不得带病落库）**：
+  ① 三教之一 + 现代科学之一 + 第三源（诸子 / 世界宗教哲学 / 希腊 / 思潮 / 地方智慧）是否三项都在；
+  ② 是否解释了编排者点名的不对称证据（见下方【本场点名】；未点名应向编排者索要，不得自选）；
+  ③ 「与既有命题的关系」是否指名到具体 P 编号（禁只填「可商榷」）；
+  ④ 判准是否被写成「强度 / 大小 / 乘积 / 距离 / 阈值」（禁——一律「判准不在 A，而在 B」+ 2–3 个**可分别检验**的维度）；
+  ⑤ 可证伪条件是否写了**可观察的反面现象**（禁循环：不得用「若该机制不成立则失效」式同义反复）；
+  ⑥ 引用是否全部可查（人物 + 篇名 / 期刊 + 年份或 DOI），是否混入素材池与点名清单之外的数据（禁）；
+  ⑦ 儒 / 佛条目是否显式在场（本机恒定缺陷：缺席不留空即视为没有）。
+- **【本场点名】（编排者必填；缺项模型应拒绝输出并回索）**：不对称证据 = __________；划界命题 = P____；必用条目 = __________。
 - `response` 为空或 < 100 字符 → 重试一次；仍失败则记录并结束。
 
 ## 7 · 取证纪律与禁令清单（重复踩过的坑）
@@ -276,6 +300,12 @@ def main():
         print(f"{'新方案单场固定输入':<28}{tot_new:>10} token")
         if tot_old:
             print(f"{'下降比例':<28}{(100 - tot_new * 100 / tot_old):>9.1f}%")
+        # 体量预算预警（与 preflight.py 的 G-BUDGET 同口径）
+        budgets = {"SKILL.md": 600, "CORE.md": 300, "PHILOSOPHY.md": 600}
+        for name, limit_kb in budgets.items():
+            p = os.path.join(ROOT, name)
+            if os.path.exists(p) and os.path.getsize(p) > limit_kb * 1024:
+                print(f"⚠ {name} 超预算 {limit_kb}KB——安排结构性压缩（preflight G-BUDGET 同）")
         return
 
     from datetime import datetime
@@ -290,6 +320,10 @@ def main():
                    .replace("{p_count}", str(len(props))) \
                    .replace("{c_count}", str(len(cores))) \
                    .replace("{p_max}", str(p_max)) \
+                   .replace("{skill_kb}", kb(SKILL)) \
+                   .replace("{core_kb}", kb(CORE)) \
+                   .replace("{phil_kb}", kb(os.path.join(ROOT, "PHILOSOPHY.md"))) \
+                   .replace("{corpus_kb}", kb(os.path.join(ROOT, "references", "tuiyan_corpus.md"))) \
                    .replace("{p_index}", p_index) \
                    .replace("{c_index}", c_index)
     # 清理模板里的转义占位符
