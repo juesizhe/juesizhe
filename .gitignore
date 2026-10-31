@@ -8,3 +8,6 @@ _site/
 .DS_Store
 Thumbs.db
 *.swp
+
+# 分册 / 批处理产生的本地差分备份（禁止上传公开仓库）
+*.presplit
