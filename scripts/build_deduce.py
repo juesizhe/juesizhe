@@ -34,8 +34,12 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import core_source  # noqa: E402  纲要多卷加载器：分册后取「逻辑整文档」的唯一入口
+
 SKILL = os.path.join(ROOT, "SKILL.md")
-CORE = os.path.join(ROOT, "CORE.md")
+CORE = core_source.core_path()          # 纲要总册：文件头／总纲／分册导航／分工说明／来源映射
+CORE_PARTS = core_source.part_rel_paths()  # 纲要正文七卷：core/part-01.md … part-07.md
 OUT_DIR = os.path.join(ROOT, "prompts")
 DEDUCE = os.path.join(OUT_DIR, "deduce.md")
 CORE_INDEX = os.path.join(OUT_DIR, "core_index.md")
@@ -57,6 +61,16 @@ def truncate(s, n):
 def kb(path):
     """实测文件体量（KB），用于载荷里的「禁止整本读」提示——杜绝手写数字漂移。"""
     return f"{os.path.getsize(path) / 1024:.0f}KB" if os.path.exists(path) else "缺失"
+
+
+def kb_total():
+    """CORE.md + 七卷合计（KB）。"""
+    return f"{core_source.total_kb():.0f}KB"
+
+
+def kb_max_part():
+    """最大单卷（KB）。"""
+    return f"{core_source.max_part_kb():.0f}KB"
 
 
 def parse_propositions(text):
@@ -110,9 +124,9 @@ def parse_core(text):
 
 TEMPLATE = """# 觉思者 · 推演专用精简载荷（prompts/deduce.md）
 
-> 本文件由 `scripts/build_deduce.py` 从 SKILL.md / CORE.md **自动派生**，请勿手改。
+> 本文件由 `scripts/build_deduce.py` 从 SKILL.md / CORE.md（及其七卷）**自动派生**，请勿手改。
 > 每次采纳新命题后重跑 `python scripts/build_deduce.py` 以保持索引最新。
-> 权威源：SKILL.md（规则与命题库正文）／CORE.md（纲要正文）／PHILOSOPHY_SUMMARY.md（推演上下文）。
+> 权威源：SKILL.md（规则与命题库正文）／CORE.md + `core/part-01..07.md`（纲要正文，多卷）／PHILOSOPHY_SUMMARY.md（推演上下文）。
 > **本载荷替代不了权威源，只是让每场推演不必为同一份规则重复付费。**
 
 生成时间：{gen_time} ｜ 命题库索引 {p_count} 条 ｜ 纲要索引 {c_count} 条
@@ -132,7 +146,8 @@ TEMPLATE = """# 觉思者 · 推演专用精简载荷（prompts/deduce.md）
 - ❌ 推理前整本读 `SKILL.md`（{skill_kb}）——只看 overwrite「核心命题库」区，且优先看本文件索引。
 - ❌ 推理前整本读 `PHILOSOPHY.md`（{phil_kb}）——它只追加不删，全量加载必然撑爆上下文。
 - ❌ 推理前整本读 `references/tuiyan_corpus.md`（{corpus_kb}）——草稿素材池，只取索引与命中片段。
-- ❌ 推理前整本读 `CORE.md`（{core_kb}）——默认读 `prompts/core_index.md`，只有需要完整论证链时才回查正文。
+- ❌ 推理前整本读 `CORE.md` 与其七卷正文（合计 {core_kb}，最大单卷 {core_max_kb}）——
+  默认读 `prompts/core_index.md`；需要论证链时**按卷**回查 `core/part-0N.md`，勿整包读。
 
 **唯一合法的档案局部调阅通道**（单次 ≤8000 字符）：
 ```bash
@@ -256,9 +271,9 @@ python scripts/make_card.py P36      # 生成命题卡（模板拼串，不调 L
 
 {p_index}
 
-## 10 · 纲要索引（CORE.md）
+## 10 · 纲要索引（CORE.md + 七卷）
 
-> 只有 C 序号与标题。需要完整论证链再回查 CORE.md 正文。
+> 只有 C 序号与标题。需要完整论证链时，先按 `core/` 分册导航找到所属卷，再回查该卷正文。
 
 {c_index}
 """
@@ -271,29 +286,30 @@ def main():
         sys.exit(2)
 
     skill = read(SKILL)
-    core = read(CORE) if os.path.exists(CORE) else ""
+    core = core_source.text() if os.path.exists(CORE) else ""
     props = parse_propositions(skill)
     cores = parse_core(core)
 
     if check_only:
-        rows = [
-            ("SKILL.md", SKILL), ("CORE.md", CORE), ("PHILOSOPHY.md", os.path.join(ROOT, "PHILOSOPHY.md")),
-            ("corpus", os.path.join(ROOT, "references", "tuiyan_corpus.md")),
-            ("prompts/deduce.md", DEDUCE), ("prompts/core_index.md", CORE_INDEX),
-            ("PHILOSOPHY_SUMMARY.md", os.path.join(ROOT, "PHILOSOPHY_SUMMARY.md")),
-        ]
+        # 第三项为 True＝「旧方案」必读项（用于算下降比例）
+        rows = [("SKILL.md", SKILL, True), ("CORE.md", CORE, True)] \
+            + [(rel, os.path.join(ROOT, rel), True) for rel in CORE_PARTS] \
+            + [("PHILOSOPHY.md", os.path.join(ROOT, "PHILOSOPHY.md"), True),
+               ("corpus", os.path.join(ROOT, "references", "tuiyan_corpus.md"), True),
+               ("prompts/deduce.md", DEDUCE, False), ("prompts/core_index.md", CORE_INDEX, False),
+               ("PHILOSOPHY_SUMMARY.md", os.path.join(ROOT, "PHILOSOPHY_SUMMARY.md"), False)]
         print(f"{'文件':<28}{'字节':>10}{'估token':>10}")
         tot_old = tot_new = 0
-        for name, p in rows:
+        for name, p, is_old in rows:
             if not os.path.exists(p):
                 print(f"{name:<28}{'缺失':>10}")
                 continue
             size = os.path.getsize(p)
             tok = int(size * 0.62)  # 中英混排保守估算：约 1.6 字节 / token
             print(f"{name:<28}{size:>10}{tok:>10}")
-            if name in ("SKILL.md", "CORE.md", "PHILOSOPHY.md", "corpus"):
+            if is_old:
                 tot_old += tok
-            if name in ("prompts/deduce.md", "prompts/core_index.md", "PHILOSOPHY_SUMMARY.md"):
+            else:
                 tot_new += tok
         print("-" * 48)
         print(f"{'旧方案单场固定输入':<28}{tot_old:>10} token")
@@ -302,6 +318,7 @@ def main():
             print(f"{'下降比例':<28}{(100 - tot_new * 100 / tot_old):>9.1f}%")
         # 体量预算预警（与 preflight.py 的 G-BUDGET 同口径）
         budgets = {"SKILL.md": 600, "CORE.md": 300, "PHILOSOPHY.md": 600}
+        budgets.update({rel: 300 for rel in CORE_PARTS})
         for name, limit_kb in budgets.items():
             p = os.path.join(ROOT, name)
             if os.path.exists(p) and os.path.getsize(p) > limit_kb * 1024:
@@ -321,7 +338,8 @@ def main():
                    .replace("{c_count}", str(len(cores))) \
                    .replace("{p_max}", str(p_max)) \
                    .replace("{skill_kb}", kb(SKILL)) \
-                   .replace("{core_kb}", kb(CORE)) \
+                   .replace("{core_kb}", kb_total()) \
+                   .replace("{core_max_kb}", kb_max_part()) \
                    .replace("{phil_kb}", kb(os.path.join(ROOT, "PHILOSOPHY.md"))) \
                    .replace("{corpus_kb}", kb(os.path.join(ROOT, "references", "tuiyan_corpus.md"))) \
                    .replace("{p_index}", p_index) \
@@ -335,8 +353,8 @@ def main():
 
     core_body = (
         "# 觉思者 · 纲要索引（prompts/core_index.md）\n\n"
-        "> 由 `scripts/build_deduce.py` 从 CORE.md 自动派生，请勿手改。\n"
-        "> 推演默认读本索引；需要完整论证链时才回查 CORE.md 正文。\n\n"
+        "> 由 `scripts/build_deduce.py` 从 CORE.md 及其七卷自动派生，请勿手改。\n"
+        "> 推演默认读本索引；需要完整论证链时才按卷回查 `core/part-0N.md` 正文。\n\n"
         f"生成时间：{gen_time} ｜ 共 {len(cores)} 条\n\n"
         "## 索引\n\n" + c_index + "\n"
     )
