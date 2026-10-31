@@ -64,6 +64,17 @@ MANAGED = [
     "references/canon.md",
 ]
 
+# ── 纲要多卷加载器（2026-10-27 分册后唯一入口）──────────────────────────
+# CORE.md 按域拆为 core/part-01..07.md；七卷须与 CORE.md 同受行尾/体量门禁。
+# 加载器缺失时退化为只读 CORE.md（保证回滚状态下本文件仍能跑）。
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import core_source  # noqa: E402
+
+    MANAGED = MANAGED + core_source.part_rel_paths()
+except Exception:  # pragma: no cover
+    core_source = None
+
 # 已合并、编号不回收的历史缺号（P3→C1、P10→C9；内容全留，见蒸馏日志）
 RETIRED_P = {3, 10}
 
@@ -201,7 +212,8 @@ def gate_count():
     if not (os.path.exists(sp) and os.path.exists(cp)):
         return [("命题↔纲要计数", "文件缺失", "FAIL", "SKILL.md 或 CORE.md 不存在")], ["count"]
     ids = parse_p_ids(read_text(sp))
-    centries = parse_c_entries(read_text(cp))
+    core_text = read_text(cp) if core_source is None else core_source.text()
+    centries = parse_c_entries(core_text)
     live = {i for i in ids if i not in RETIRED_P}
     rows, bad = [], []
     cids = [c for c, _, _ in centries]
@@ -252,7 +264,7 @@ def gate_index():
         rows.append(("deduce.md 索引", f"{actual} 条 == 权威 {live_n}", "PASS", ""))
     # core_index.md
     if os.path.exists(cp):
-        core = read_text(os.path.join(ROOT, "CORE.md"))
+        core = core_source.text() if core_source is not None else read_text(os.path.join(ROOT, "CORE.md"))
         c_n = len(parse_c_entries(core))
         ci = read_text(cp)
         m2 = re.search(r"共\s*(\d+)\s*条", ci)
@@ -285,8 +297,11 @@ def gate_sum():
 
 def gate_budget():
     rows = []
-    for rel, key in [("SKILL.md", "skill_budget_kb"), ("CORE.md", "core_budget_kb"),
-                     ("PHILOSOPHY.md", "phil_budget_kb")]:
+    targets = [("SKILL.md", "skill_budget_kb"), ("CORE.md", "core_budget_kb"),
+               ("PHILOSOPHY.md", "phil_budget_kb")]
+    if core_source is not None:
+        targets += [(rel, "core_budget_kb") for rel in core_source.part_rel_paths()]
+    for rel, key in targets:
         p = os.path.join(ROOT, rel)
         if not os.path.exists(p):
             continue
@@ -296,6 +311,10 @@ def gate_budget():
             rows.append((rel, f"{kb:.0f}KB / 预算 {limit}KB", "WARN", "超预算——安排结构性压缩"))
         else:
             rows.append((rel, f"{kb:.0f}KB / 预算 {limit}KB", "PASS", ""))
+    if core_source is not None and len(targets) > 3:
+        tot = core_source.total_kb()
+        rows.append(("CORE 合计（含七卷）", f"{tot:.0f}KB / 单文件上限 300KB", "PASS",
+                     "分册后任何单文件均须 ≤300KB；总量不再受限"))
     return rows, []
 
 
