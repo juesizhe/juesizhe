@@ -138,9 +138,15 @@ def load_blacklist():
     if not os.path.exists(LEDGER):
         return items
     text = open(LEDGER, encoding="utf-8").read()
-    if "伪证黑名单" not in text:
+    # 锚点必须落在二级标题「## 二、伪证黑名单」：文件首行标题（「已验证证据表与伪证黑名单」）
+    # 同样含有这四个字，若以裸词切分会把「一、已验证证据（可引用）」正表整段当成黑名单，
+    # 使正表中已被采用的可引条目被误判为伪证（2026-10-30 实测：法藏《华严金师子章》条目被误伤）。
+    marker = "## 二、伪证黑名单"
+    if marker not in text:
+        marker = "伪证黑名单"
+    if marker not in text:
         return items
-    part = text.split("伪证黑名单", 1)[1]
+    part = text.split(marker, 1)[1]
     for line in part.splitlines():
         line = line.strip().lstrip("-|0123456789. ").strip()
         if len(line) >= 4 and not line.startswith("#") and not line.startswith(">"):
