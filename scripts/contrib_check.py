@@ -147,6 +147,17 @@ def load_blacklist():
     if marker not in text:
         return items
     part = text.split(marker, 1)[1]
+    # 终止锚点（2026-11-02 补）：黑名单区止于「## 三、维护纪律」。
+    # 缺此锚点时，其后逐批追加的「已验证证据（可引用）」正表整段会被一并读成黑名单，
+    # 使正表中已被采用的可引条目被误判为伪证（2026-11-02 实测：安萨里《圣学复苏》论羞
+    # 之转据条目误伤候选；与 2026-10-30 法藏条目误伤同源，均系区块无终止边界）。
+    end_marker = "## 三、维护纪律"
+    if end_marker in part:
+        part = part.split(end_marker, 1)[0]
+    else:
+        m = re.search(r"^## ", part, re.M)
+        if m:
+            part = part[:m.start()]
     for line in part.splitlines():
         line = line.strip().lstrip("-|0123456789. ").strip()
         if len(line) >= 4 and not line.startswith("#") and not line.startswith(">"):
